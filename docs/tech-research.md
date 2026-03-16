@@ -18,10 +18,10 @@
 能力一：声音学习         ──► [人声分离] + [声音特征学习/Fine-tune]
 能力二：声音替换         ──► [人声分离] + [声音转换推理] + [音频混合]
 能力三：歌词生成         ──► [歌词结构解析] + [LLM 调用]
-能力四：歌词替换与合成   ──► [人声分离] + [ASR+时间轴对齐] + [歌唱合成TTS] + [音频混合]
+能力四：歌词替换与合成   ──► [人声分离] + [LRC解析/ASR对齐] + [歌唱合成] + [时间对齐] + [音频混合]
 ```
 
-可以看出，**人声分离** 是能力一、二、四共用的基础模块，**音频混合** 是能力二、四共用的后处理模块。核心技术决策点集中在以下 4 个模块：
+可以看出，**人声分离** 是能力一、二、四共用的基础模块，**音频混合** 是能力二、四共用的后处理模块。核心技术决策点集中在以下模块：
 
 | 模块编号 | 技术模块 | 被哪些能力使用 |
 |---|---|---|
@@ -551,9 +551,11 @@ class SVSBackend(SynthesisBackend):
 | **运行环境** | macOS Apple Silicon + Python 3.10 + PyTorch MPS | 已确定 |
 | **M-1 人声分离** | **Demucs v4（htdemucs 模型）** | `pip install demucs`，`-d mps` 加速 |
 | **M-2 声音转换** | **seed-vc**（SVC 模型：seed-uvit-whisper-base） | 零样本 + fine-tune，官方支持 Apple Silicon |
-| **M-3 LLM 歌词生成** | **OpenAI API（首选）** / Ollama 本地（备选） | 设计为可插拔接口 |
-| **M-4a 时间轴提取** | **WhisperX** | Whisper + 强制对齐，词级时间戳 |
-| **M-4b 歌唱重合成** | **seed-vc SVC 路线 A**（复用 M-2） | PoC 验证后如质量不足可切换 DiffSinger |
+| **M-3 LLM 歌词生成** | **DeepSeek / OpenAI / Qwen**（云端）/ **Ollama**（本地） | 统一 OpenAI SDK 协议，通过 `llm.provider` 配置切换 |
+| **M-4a 时间轴获取** | **LRC 文件解析**（首选）/ **WhisperX**（无 LRC 时兜底） | 优先用用户提供的 LRC，无 LRC 时自动 ASR |
+| **M-4b TTS 引擎** | **edge-tts**（默认）/ pyttsx3（离线 fallback） | 路线 A 内部步骤；音色由后续 SVC 决定 |
+| **M-4b 歌唱合成** | **seed-vc SVC 路线 A**（默认）/ DiffSinger 路线 B（备选） | 通过 `synthesis.route` 配置切换 |
+| **M-4c 时间轴对齐** | **pyrubberband** | 音高保持时间伸缩，`pip install pyrubberband` |
 | **CLI 框架** | **Typer**（基于 Click） | 类型注解友好，帮助文档自动生成 |
 | **音频处理基础库** | **pydub + ffmpeg** | 格式转换、音频混合 |
 
