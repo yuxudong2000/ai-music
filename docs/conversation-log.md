@@ -244,11 +244,54 @@
 | 技术预研选型文档 | v0.3 | `docs/tech-research.md` |
 | 对话记录 | — | `docs/conversation-log.md` |
 
+---
+
+### 会话十五：搭建开发环境
+
+**用户需求**：「让我们先把开发环境搭建起来」
+
+**环境基础**（已有）：macOS Apple Silicon（arm64）、conda 24.1.2、Homebrew 5.0.12、ffmpeg 7.0.2
+
+**完成步骤**：
+
+1. 创建 conda 虚拟环境 `ai-music`（Python 3.10）
+2. 安装 PyTorch 2.10.0（MPS 可用 ✅）
+3. 安装 Demucs 4.0.1（M-1 人声分离）
+4. WhisperX（M-4a LRC 兜底）——用户跳过，后续按需安装
+5. 安装基础依赖：pydub / pyrubberband / edge-tts / pyttsx3 / typer / openai
+6. 系统依赖：rubberband 3.3.0（brew install）
+
+**初始化项目结构**：
+
+```
+ai-music/
+├── src/ai_music/
+│   ├── cli.py          # CLI 入口（typer，命令框架）
+│   ├── lrc/            # 功能一：LRC 提取
+│   ├── voice/          # 功能二：声音学习
+│   ├── lyrics/         # 功能四：歌词生成
+│   ├── synthesis/      # 功能五：歌词替换合成
+│   ├── audio/          # 音频处理公共模块
+│   └── config/         # 配置管理
+├── tests/
+├── scripts/check_env.py  # 环境验证脚本
+├── requirements.txt
+├── pyproject.toml
+└── .gitignore
+```
+
+**环境验证结果（15 项全部通过）**：Python 3.10 / PyTorch 2.10 MPS ✅ / Demucs 4.0.1 / pyrubberband 0.4.0 / openai 2.28.0 / edge-tts / typer 0.24.1 / ffmpeg 7.0.2 / rubberband 3.3.0
+
+**注意**：seed-vc 需单独 `git clone` 安装（未通过 pip），待 PoC 阶段处理。
+
+---
+
 ## 待办事项
 
-- [ ] PoC 验证：Demucs + seed-vc 跑通声音替换（能力三）
-- [ ] PoC 验证：WhisperX + seed-vc SVC 跑通歌词替换合成（能力五简化版）
-- [ ] 设计 CLI 架构：模块结构、命令接口、数据流
+- [ ] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
+- [ ] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
+- [ ] PoC-B：WhisperX + seed-vc SVC 跑通歌词替换合成（功能五简化版）
+- [ ] 各功能模块的具体实现
 
 ---
 
