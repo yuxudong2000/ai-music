@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# AI 模型文件（不提交到 git）
+*.pth
+*.pt
+*.bin
+*.onnx
+*.safetensors
+
+# 音频文件（不提交到 git）
+*.mp3
+*.wav
+*.flac
+*.ogg
+*.m4a
+
+# 输出目录
+output/

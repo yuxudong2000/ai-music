@@ -1,0 +1,35 @@
+# AI Music 核心依赖
+# 运行环境：macOS Apple Silicon · Python 3.10 · PyTorch MPS
+
+# --- 深度学习框架 ---
+torch==2.10.0
+torchaudio==2.10.0
+
+# --- M-1: 人声分离 ---
+demucs==4.0.1
+
+# --- M-3: LLM 歌词生成 ---
+openai==2.28.0            # 统一 SDK，兼容 DeepSeek/Qwen/Ollama
+
+# --- M-4b: TTS 引擎（路线 A） ---
+edge-tts==7.2.7           # 默认 TTS（需联网）
+pyttsx3==2.99             # 离线 fallback（macOS 系统 TTS）
+
+# --- M-4c: 时间轴对齐 ---
+pyrubberband==0.4.0       # 需系统安装 rubberband：brew install rubberband
+
+# --- 音频处理基础 ---
+pydub==0.25.1             # 需系统安装 ffmpeg：brew install ffmpeg
+soundfile==0.13.1
+numpy==2.2.6
+
+# --- CLI 框架 ---
+typer==0.24.1
+
+# --- 工具库 ---
+tqdm==4.67.3
+pyyaml==6.0.3
+rich==14.3.3              # CLI 美化输出
+
+# --- M-4a: LRC 提取（兜底，按需安装） ---
+# whisperx                # pip install whisperx（首次使用 lrc extract 时提示安装）
