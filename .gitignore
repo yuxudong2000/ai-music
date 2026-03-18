@@ -31,12 +31,4 @@ env/
 *.onnx
 *.safetensors
 
-# 音频文件（不提交到 git）
-*.mp3
-*.wav
-*.flac
-*.ogg
-*.m4a
-
-# 输出目录
-output/
+# 音频文件：通过 Git LFS 追踪（见 .gitattributes），不在此忽略
