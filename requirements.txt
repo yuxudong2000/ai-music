@@ -7,6 +7,7 @@ torchaudio==2.10.0
 
 # --- M-1: 人声分离 ---
 demucs==4.0.1
+audio-separator[cpu]==0.42.1  # UVR/MDX-Net 人声净化（二次分离）；Apple Silicon 自动启用 CoreML
 
 # --- M-3: LLM 歌词生成 ---
 openai==2.28.0            # 统一 SDK，兼容 DeepSeek/Qwen/Ollama
