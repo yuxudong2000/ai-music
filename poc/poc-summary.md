@@ -3,7 +3,7 @@
 > **日期**：2026-03-18  
 > **验证范围**：PoC-A（声音替换 — Demucs + seed-vc）  
 > **运行环境**：macOS Apple Silicon M2 Pro · Python 3.10 · PyTorch MPS  
-> **状态**：✅ 流程跑通，⚠️ 音色相似度待提升
+> **状态**：✅ 流程跑通，⚠️ 音色相似度待提升，⚠️ 跨性别转换存在明显音色偏差
 
 ---
 
@@ -56,7 +56,7 @@
 
 **已知问题**：
 - 分离后的人声音轨中仍存在轻微伴奏残留（bleed），当该音轨用作 seed-vc 的目标参考音频时，会影响 Speaker Embedding 的纯净度，进而降低音色转换的相似度
-- 尝试使用 `audio-separator`（UVR MDX-Net 模型）对人声做二次净化，但因网络下载模型文件不稳定未完成验证
+- 已成功使用 `audio-separator`（`mel_band_roformer_kim_ft2_bleedless_unwa` 模型，870MB）对 `tongyang.mp3` 分离出的人声做二次净化，去除伴奏泄漏，净化后响度下降 0.8 dB（-16.5 → -17.4 dBFS），Speaker Embedding 纯净度得到改善
 
 ---
 
@@ -83,6 +83,7 @@
 | ② | VC + 音量修复 | False | 30 | 0.7 | 3.08× | `final_voice_replace_v2.mp3` |
 | ③ | **SVC** | **True** | 30 | 0.7 | 6.28× | `final_svc_v1.mp3` |
 | ④ | SVC | True | 30 | **0.8** | 2.55× | `compare_cfg08.mp3` |
+| ⑤ | SVC + bleedless 净化 target | True | 30 | 0.8 | 9.2× | `compare_tongyang_clean_cfg08.mp3` |
 
 #### 3.2.3 关键发现
 
@@ -102,6 +103,27 @@
 - **SVC 模式**（f0-condition=True）：音色相似度有所提升，但仍与目标存在可感知差距
 - cfg-rate 从 0.7 提高到 0.8：音色更贴近目标参考，但差异仍然存在
 - 主要瓶颈：**Zero-shot 模式 + 伴奏泄漏的参考音频** 限制了音色还原上限
+- bleedless 二次净化实验（实验⑤）：target 音色更纯净，但 source（女声）→ target（男声）的跨性别场景导致输出音色仍偏女声，需配合 F0 降调处理
+
+**跨性别转换实验（P-6 发现）**：
+
+在实验⑤中（实验编号见下文更新后表格），使用 `tongyang.mp3`（痛仰乐队 - 再见杰克，**男声**）作为 target，
+`source.mp3`（王菲 - 匆匆那年，**女声**）作为 source，输出结果听感仍为女声。
+
+**根因分析**：
+
+| 因素 | 说明 |
+|------|------|
+| seed-vc SVC 模式工作机制 | 从 source 提取 F0 轮廓（旋律），仅替换音色（Speaker Embedding），F0 本身不变 |
+| 女声 F0 范围 | ~200–400 Hz |
+| 男声 F0 范围 | ~80–200 Hz |
+| `--auto-f0-adjust` 效果 | 按 source/target 的 F0 中位数做整体平移，但王菲均值约 280Hz，痛仰均值约 140Hz，差距约 1 个八度 |
+| 实际现象 | `--auto-f0-adjust True` 做了部分补偿，但 F0 整体仍处于女声区间，导致音色感知偏女声 |
+
+**解决方案**：
+- **方案 A（快速验证）**：加 `--semi-tone-shift -8~-10` 强制将 F0 下移 8-10 个半音（≈ 降低约 1 个八度的 2/3）
+- **方案 B（根本解决）**：使用同性别的 source/target 对，避免跨性别场景（如女→女、男→男）
+- **方案 C（长期）**：Fine-tune 模式（RVC/seed-vc fine-tune）在训练时即可对齐音域分布，天然支持跨性别转换
 
 ---
 
@@ -156,14 +178,15 @@
 
 ### 6.2 下一步建议
 
-**短期（P0 — 修复环境）**：
-1. 修复 `torch` / `torchaudio` 版本兼容性问题（回退 torch 到 2.8.0 或升级 torchaudio）
-2. 将 seed-vc 的 MPS float64 修复提交到上游仓库或在本项目中记录补丁
+**短期（P0 — 修复环境）**：✅ 已完成
+1. ✅ 升级 torchaudio 到 2.10.0 解决版本兼容性
+2. ✅ seed-vc MPS float64 修复已记录并应用
 
 **中期（P1 — 提升音色质量）**：
-3. **验证 seed-vc Fine-tune**：用 target 人声数据做少量训练（100-500 步），评估音色相似度提升幅度 ← 这是技术预研文档中已规划的核心路径
-4. **验证 RVC v2 Fine-tune**：作为 seed-vc 的备选方案，RVC 社区生态更成熟，Fine-tune 流程更简单
-5. **人声二次净化**：解决 audio-separator 的模型下载问题，用 MDX-Net/MelBand Roformer 模型对 Demucs 分离的人声做二次净化，提升 Speaker Embedding 纯净度
+3. **解决跨性别转换问题**（P-6）：对跨性别场景在 seed-vc 推理时增加 `--semi-tone-shift -8~-10` 降调，或统一使用同性别 source/target 对，进行对比实验
+4. **验证 seed-vc Fine-tune**：用 target 人声数据做少量训练（100-500 步），评估音色相似度提升幅度 ← 这是技术预研文档中已规划的核心路径
+5. **验证 RVC v2 Fine-tune**：作为 seed-vc 的备选方案，RVC 社区生态更成熟，Fine-tune 流程更简单
+6. ✅ **人声二次净化**：已使用 `mel_band_roformer_kim_ft2_bleedless_unwa` 完成净化验证
 
 **长期（P2 — PoC-B）**：
 6. 启动 PoC-B 验证"歌词替换与合成"（能力四），这是技术风险最高的模块
