@@ -71,7 +71,7 @@
 | **扩散步数** | 10 |
 | **设备** | MPS |
 | **RTF** | 1.52× |
-| **输出** | `poc/output/final_poc_a.mp3` |
+| **输出** | `poc/experiments/exp-01-smoke-test/output/final_poc_a.mp3` |
 
 #### 3.2.2 真实歌曲测试
 
