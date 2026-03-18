@@ -286,11 +286,211 @@ ai-music/
 
 ---
 
+---
+
+## 2026-03-17
+
+### 会话十六：PoC-A 冒烟测试 — TTS 合成音频跑通端到端流程
+
+**用户需求**：启动 PoC-A 验证，先用 TTS 合成音频做冒烟测试。
+
+**完成步骤**：
+1. `git clone` 安装 seed-vc 到 `/Users/yuxudong/Documents/seed-vc`
+2. 使用 `generate_source.py`（edge-tts zh-CN-XiaoxiaoNeural）和 `generate_target.py`（zh-CN-YunxiNeural）生成测试音频
+3. 编写 `poc_a_voice_replace.py`：Demucs 人声分离 → seed-vc VC 转换 → pydub 混合
+4. 端到端跑通，输出 `final_poc_a.mp3`
+
+**结果**：✅ 流程跑通，Demucs 分离 < 1s，seed-vc 转换 RTF 1.52×
+
+---
+
+### 会话十七：PoC-A 真实歌曲测试 — VC 模式（exp-02）
+
+**用户需求**：用真实歌曲替换 TTS 合成音频，验证真实场景效果。
+
+**测试数据**：
+- source：王菲 - 匆匆那年（女声，241s）
+- target：邓丽君 - 我只在乎你（女声，252s）
+
+**发现问题 P-2**：seed-vc 输出人声音量极低（-40 dBFS vs 原始人声 -16.3 dBFS），直接混合后人声几乎听不到。
+
+**输出**：`final_voice_replace.mp3`（音量严重失衡，不可用）
+
+---
+
+### 会话十八：PoC-A 音量修复（exp-03）
+
+**修复方案**：`mix_real.py` 新增 `match_rms()` 函数，混合前将转换人声的 RMS 电平对齐到原始人声。
+
+```python
+def match_rms(source, reference):
+    diff_db = reference.dBFS - source.dBFS
+    return source + diff_db
+```
+
+**结果**：⚠️ 音量问题解决，但 VC 模式不保留 F0 旋律，听感有明显旋律漂移。
+
+---
+
+### 会话十九：PoC-A 切换 SVC 模式 + MPS Bug 修复（exp-04）
+
+**用户需求**：诊断并修复声音替换中的音高和节奏质量问题。
+
+**关键变更**：
+1. 将 `--f0-condition` 从 `False` 改为 `True`（启用 SVC 歌唱模式，保留 F0 旋律）
+2. 新增 `--auto-f0-adjust True` 和 `--semi-tone-shift 0`
+3. 将扩散步数从 10 提升到 30
+
+**Bug 修复 — MPS float64**：
+- `seed-vc/inference.py` 第 329-330 行：`torch.from_numpy(F0).to(device)` → 加 `.float()`
+- 根因：numpy 默认 float64，MPS 不支持
+
+**结果**：⭐⭐⭐ SVC cfg=0.7 基本可用，旋律保留但音色相似度仍有差距。
+
+---
+
+### 会话二十：PoC-A CFG 调优（exp-05）
+
+将 `--inference-cfg-rate` 从 0.7 提升到 0.8，验证对音色相似度的影响。
+
+**结果**：⭐⭐⭐+ 音色更贴近目标参考，RTF 改善到 2.55×。**当前同性别场景最优配置。**
+
+---
+
+### 会话二十一：PoC-A 总结文档编写
+
+**产出**：创建 `poc-summary.md`，完整记录：
+- 各模块验证结果（Demucs ✅ / seed-vc ⚠️ / 混合 ✅）
+- 端到端性能数据（4 分钟歌曲 → 11 分钟处理）
+- 遗留问题列表（P-1 ~ P-5）
+- 下一步建议
+
+---
+
+## 2026-03-18
+
+### 会话二十二：修复 torch/torchaudio 兼容性
+
+**问题**：安装 `audio-separator` 时 torch 被升级为 2.10.0，torchaudio 二进制不兼容（libtorchaudio.so 加载失败）。
+
+**修复**：`pip install --upgrade torchaudio`（2.8.0 → 2.10.0）
+
+**验证**：torch / torchaudio / demucs CLI / audio-separator / MPS 全部正常。
+
+**附加**：`requirements.txt` 新增 `audio-separator[cpu]==0.42.1`
+
+---
+
+### 会话二十三：参考音频二次净化 — bleedless 模型
+
+**目标**：解决 P-2（参考音频伴奏泄漏问题）。
+
+**完成步骤**：
+1. 使用 audio-separator 下载最佳模型 `mel_band_roformer_kim_ft2_bleedless_unwa.ckpt`（870MB）
+2. 对 tongyang.mp3 先做 Demucs 一次分离（28s，MPS，RTF ~9.8×）
+3. 再用 bleedless 模型做二次净化（98s，RTF ~2.8×）
+
+**净化效果**：响度从 -16.5 dBFS 降至 -17.4 dBFS（-0.8 dB），证明去除了部分残留信号。
+
+---
+
+### 会话二十四：跨性别转换实验（exp-06）
+
+**目标**：用净化后的痛仰乐队人声（男声）作为 target，验证二次净化 + 跨性别转换。
+
+**完成步骤**：
+1. 以 bleedless 净化后的痛仰人声作为 seed-vc target 参考音频
+2. seed-vc SVC 推理（source 241s，cfg=0.8，30 步）→ 耗时约 37 分钟（RTF ~9.2×）
+3. pydub 混合输出 `compare_tongyang_clean_cfg08.mp3`
+
+**发现问题 P-6 — 跨性别转换**：
+- source = 王菲（女声，F0 均值 ~280Hz）
+- target = 痛仰乐队（男声，F0 均值 ~140Hz）
+- 输出听感**仍偏女声**
+- 根因：seed-vc SVC 保留 source 的 F0 轮廓，auto-f0-adjust 只做整体平移，F0 仍处于女声区间
+
+**解决方案（已记录）**：
+- 方案 A：`--semi-tone-shift -8~-10` 强制降调
+- 方案 B：换用同性别 source/target 对
+- 方案 C：Fine-tune 模式（长期）
+
+---
+
+### 会话二十五：POC 目录整理（第一轮）
+
+**用户需求**：「整理 POC 目录，按每一轮实验一个子目录的方式整理」
+
+**完成内容**：
+1. 创建 6 个实验子目录 `exp-01-smoke-test` ~ `exp-06-bleedless-cross-gender`
+2. 迁移 29 个音频文件到各实验的 `input/` / `intermediate/` / `output/` 子目录
+3. 为每个实验编写 `README.md`（验证说明）和 `result.md`（验证结果）
+4. 清理旧的散乱 `output/` 子目录和脚本
+5. 更新 `poc-summary.md` 中的文件路径引用
+
+---
+
+### 会话二十六：POC 目录整理（第二轮 — 用户手动调整）
+
+**用户操作**：手动将 poc 目录按实验类别分成两个子目录：
+- `poc/sound-repalce-experiments/` — 声音替换实验
+- `poc/lrc-replace-experiments/` — 歌词替换实验（待填充）
+
+**同步更新**：
+- `poc/audio/` 音频文件重命名为歌手-歌名格式（`source.mp3` → `wangfei-congcongnanian.mp3`）
+- 各实验 `input/` 目录中的文件名同步重命名
+- `poc-summary.md` 和各 `README.md` 中的文件路径引用更新
+
+---
+
+### 会话二十七：补全实验 README 可重现运行步骤
+
+**问题**：各实验 README 缺少完整的运行命令，无法独立重现实验。
+
+**修复内容**：
+1. 所有 README 新增「前置条件」章节（conda 环境、seed-vc 路径、pip 依赖）
+2. 所有 README 新增完整「运行步骤」章节（每一步的 CLI 命令，带 `EXP=` 变量简化路径）
+3. 补充预期耗时和依赖关系说明
+4. `mix_real.py` 从硬编码路径重构为 `argparse` CLI，可复用于任意实验
+
+---
+
+### 会话二十八：Git LFS 配置 — 音频文件纳入版本管理
+
+**用户需求**：「将音频文件也作为 git 变更的一部分，全部推送到远端仓库」
+
+**完成内容**：
+1. 配置 Git LFS 追踪 `*.mp3` / `*.wav` / `*.flac` / `*.ogg` / `*.m4a`（`.gitattributes`）
+2. 修改 `.gitignore`：移除旧的音频忽略规则，改为 LFS 管理
+3. 提交 35 个音频文件（614MB），通过 LFS 上传 711MB 到远端
+
+---
+
+### 会话二十九：对话记录整理
+
+**用户需求**：「将最近的对话总结并上传」
+
+**产出**：更新 `docs/conversation-log.md`，补充会话十六 ~ 二十九的完整记录（2026-03-17 ~ 2026-03-18）。
+
+---
+
+## 当前文档状态
+
+| 文档 | 版本 | 路径 |
+|---|---|---|
+| 需求描述文档 | v0.8 | `docs/requirements.md` |
+| 技术预研选型文档 | v0.3 | `docs/tech-research.md` |
+| 对话记录 | — | `docs/conversation-log.md` |
+| PoC-A 验证总结 | — | `poc/sound-repalce-experiments/poc-summary.md` |
+
+---
+
 ## 待办事项
 
-- [ ] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
-- [ ] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
-- [ ] PoC-B：WhisperX + seed-vc SVC 跑通歌词替换合成（功能五简化版）
+- [x] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
+- [x] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
+- [ ] 跨性别转换优化：`--semi-tone-shift` 降调实验 或 同性别 source/target 对验证
+- [ ] seed-vc / RVC v2 Fine-tune 验证（提升音色相似度）
+- [ ] PoC-B：歌词替换与合成验证（功能五，技术风险最高）
 - [ ] 各功能模块的具体实现
 
 ---
