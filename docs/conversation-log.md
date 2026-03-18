@@ -473,6 +473,51 @@ def match_rms(source, reference):
 
 ---
 
+### 会话三十：代码推送时同步对话记录规则
+
+**用户需求**：「记住之后当需要对代码推送到远端的时候，同时整理本次提交相关的对话信息，与代码一起提交」
+
+**规则已记录到记忆系统**：每次 `git push` 前，必须先整理当次对话信息追加到 `docs/conversation-log.md`，与代码一起提交。
+
+---
+
+### 会话三十一：PoC 遗留问题盘点
+
+**用户需求**：「看看当前 POC 验证还有哪些遗留问题」
+
+**盘点结果**：
+- 🟢 已解决：P-2（伴奏泄漏）、P-3（环境兼容性）、P-4（模型下载）
+- 🔴 未解决：P-1（音色相似度不足）、P-5（推理速度偏慢，可接受）、P-6（跨性别转换失效）
+- P-1 和 P-6 的核心解决方向：**Fine-tune 微调**
+
+---
+
+### 会话三十二：seed-vc Fine-tune PoC 验证计划
+
+**用户需求**：「从 fine-tune 开始，先整理一个 POC 验证计划」
+
+**用户补充信息**：
+- 可以提供更多目标歌手的歌曲文件（建议每位歌手 2~3 首）
+- 训练数据来源只有歌曲（全部依赖 Demucs + bleedless 净化）
+- Mac 配置为 M2 Pro 32GB，可用 batch_size=2
+
+**产出**：制定 `poc/sound-repalce-experiments/seed-vc-finetune/plan.md`，包含：
+- 4 轮实验设计（exp-07 ~ exp-10）
+- 同性别 Fine-tune（邓丽君）+ 跨性别 Fine-tune（痛仰）
+- 完整的训练参数、命令和风险预案
+
+**目录结构**：
+```
+poc/sound-repalce-experiments/seed-vc-finetune/
+├── plan.md                           验证计划
+├── exp-07-ft-same-gender-train/      同性别 Fine-tune 训练
+├── exp-08-ft-same-gender-infer/      同性别 Fine-tune 推理对比
+├── exp-09-ft-cross-gender-train/     跨性别 Fine-tune 训练
+└── exp-10-ft-cross-gender-infer/     跨性别 Fine-tune 推理对比
+```
+
+---
+
 ## 当前文档状态
 
 | 文档 | 版本 | 路径 |
@@ -481,6 +526,7 @@ def match_rms(source, reference):
 | 技术预研选型文档 | v0.3 | `docs/tech-research.md` |
 | 对话记录 | — | `docs/conversation-log.md` |
 | PoC-A 验证总结 | — | `poc/sound-repalce-experiments/poc-summary.md` |
+| Fine-tune 验证计划 | — | `poc/sound-repalce-experiments/seed-vc-finetune/plan.md` |
 
 ---
 
@@ -488,8 +534,12 @@ def match_rms(source, reference):
 
 - [x] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
 - [x] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
-- [ ] 跨性别转换优化：`--semi-tone-shift` 降调实验 或 同性别 source/target 对验证
-- [ ] seed-vc / RVC v2 Fine-tune 验证（提升音色相似度）
+- [ ] **seed-vc Fine-tune 验证**（进行中，见 Fine-tune 计划）
+  - [ ] Phase 1：环境准备（MPS 兼容性 + 数据准备）
+  - [ ] Phase 2：同性别 Fine-tune（exp-07/08）
+  - [ ] Phase 3：跨性别 Fine-tune（exp-09/10）
+  - [ ] Phase 4：总结与决策
+- [ ] 跨性别转换优化：`--semi-tone-shift` 降调实验
 - [ ] PoC-B：歌词替换与合成验证（功能五，技术风险最高）
 - [ ] 各功能模块的具体实现
 
