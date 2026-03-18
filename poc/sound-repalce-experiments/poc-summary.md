@@ -35,8 +35,8 @@
 
 | 文件 | 说明 | 时长 | 采样率 |
 |------|------|------|--------|
-| `poc/audio/source.mp3` | 源歌曲 | 241s (4分01秒) | 44100Hz 立体声 |
-| `poc/audio/target.mp3` | 目标歌手歌曲 | 252s (4分12秒) | 44100Hz 立体声 |
+| `poc/audio/wangfei-congcongnanian.mp3` | 源歌曲 | 241s (4分01秒) | 44100Hz 立体声 |
+| `poc/audio/denglijun-wozhizaihuni.mp3` | 目标歌手歌曲 | 252s (4分12秒) | 44100Hz 立体声 |
 
 ---
 
@@ -71,7 +71,7 @@
 | **扩散步数** | 10 |
 | **设备** | MPS |
 | **RTF** | 1.52× |
-| **输出** | `poc/experiments/exp-01-smoke-test/output/final_poc_a.mp3` |
+| **输出** | `poc/sound-repalce-experiments/exp-01-smoke-test/output/final_poc_a.mp3` |
 
 #### 3.2.2 真实歌曲测试
 
