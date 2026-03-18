@@ -518,6 +518,109 @@ poc/sound-repalce-experiments/seed-vc-finetune/
 
 ---
 
+---
+
+### 会话三十三：Fine-tune 数据准备 — 邓丽君人声提取
+
+**用户需求**：提供邓丽君 5 首歌曲用于 Fine-tune 训练数据准备（放置在 `poc/audio/denglijun/`）。
+
+**完成内容**：
+1. 使用 Demucs htdemucs 对 5 首歌曲做人声分离
+2. 发现 audio-separator bleedless 二次净化输出文件名冲突（全部覆盖为同一文件）
+3. **修复方案**：编写循环脚本，每首歌分别处理到独立临时目录后重命名为 `{songname}_clean.wav`
+4. 成功产出 5 个净化人声文件到 `exp-07-ft-same-gender-train/training-data/clean-vocals/`
+
+**产出文件**：
+- `denglijun-renchangjiu_clean.wav`（~246s）
+- `denglijun-tianmimi_clean.wav`（~211s）
+- `denglijun-wozhizaihuni_clean.wav`（~252s）
+- `denglijun-xiaocheng_clean.wav`（~154s）
+- `denglijun-yueliang_clean.wav`（~209s）
+
+---
+
+### 会话三十四：Fine-tune 训练 — 数据切分与首次训练尝试
+
+**问题发现**：seed-vc `ft_dataset.py` 要求音频时长 1~30 秒，5 首完整歌曲（150-250 秒）全部被跳过，导致 `RecursionError`，训练崩溃。
+
+**解决方案**：创建 `split_audio.py` 脚本，将 5 首歌切分为 20 秒片段（尾部 < 10 秒丢弃）。
+
+**产出**：54 个训练片段（10-20 秒），存放在 `.../clean-vocals/segments/`
+
+**首次启动训练**：以 `--max-steps 500 --batch-size 2 --save-every 100` 参数运行，进程在 MPS 初始化 + 模型加载阶段静默 47 分钟，完全无反馈，无法判断状态，主动中止。
+
+---
+
+### 会话三十五：Fine-tune 监控体系建立
+
+**用户需求**：「在开始新的 fine tune 之前，我期望仔细计划一下，如何能够监控 fine tune 进展及时看到反馈和问题」
+
+**根因分析**（47 分钟无反馈的原因）：
+- `Trainer.__init__` 加载 5 个子模型时完全无 print 输出
+- 进程 stdout 被 conda 包装层截断，无法实时查看
+- 没有日志文件，出错后也无法事后复查
+
+**三层监控方案**：
+
+| 层级 | 方案 | 效果 |
+|------|------|------|
+| 层 1 | 修改 `seed-vc/train.py`：在 5 个子模型加载前后加 `[init x/5]` print + 耗时 | 可见初始化进度 |
+| 层 2 | 训练命令改为 `python -u train.py ... >> /tmp/ft_denglijun.log 2>&1` | 全量日志持久化 |
+| 层 3 | 创建 `monitor_train.sh` 监控面板脚本（15s 刷新，显示 loss/checkpoint/内存） | 实时全局视图 |
+
+**train.py 修改内容**（`/Users/yuxudong/Documents/seed-vc/train.py`）：
+- `__init__` 中 5 个 `build_*` 调用前后加带耗时的 print
+- `train_one_epoch` 中 `print(f"epoch {epoch}, step {iters}, loss: {ema_loss:.4f}, step_time: {step_time:.1f}s")`
+- 训练图构建阶段加 `[init]` print
+
+**验证结果（dry run max-steps=1）**：
+```
+[init 1/5] SV 模型加载完成 (1.1s)
+[init 2/5] Semantic 模型加载完成 (4.6s)
+[init 3/5] F0 模型加载完成 (1.4s)
+[init 4/5] Converter 加载完成 (1.8s)
+[init 5/5] Vocoder 加载完成 (3.7s)
+[init ✓] 所有子模型加载完成，耗时 12.5s
+epoch 0, step 0, loss: 0.5765, step_time: 8.3s
+```
+
+**新增脚本**：
+- `poc/sound-repalce-experiments/seed-vc-finetune/monitor_train.sh`
+- `poc/sound-repalce-experiments/seed-vc-finetune/run_train.sh`
+- `poc/sound-repalce-experiments/seed-vc-finetune/split_audio.py`
+
+---
+
+### 会话三十六：Fine-tune 正式训练与中止
+
+**训练参数**：`--batch-size 2 --max-steps 500 --save-every 100 --num-workers 0`
+
+**训练过程（监控数据）**：
+
+| 阶段 | Step | Loss (EMA) | step_time |
+|------|------|-----------|-----------|
+| 初始化 | — | — | 12.5s |
+| 早期（正常） | 0~90 | 0.30 → 0.42 | ~8-18s |
+| checkpoint 保存 | 100 | 0.4321 | **370s（异常）** |
+| 保存后（慢） | 110 | 0.4348 | ~160s |
+| 严重劣化 | 110+ | — | ~530s |
+
+**关键里程碑**：Step 100 的 checkpoint `DiT_epoch_00003_step_00100.pth`（2.1GB）已保存。
+
+**中止原因**：
+- 保存 2.1GB checkpoint 触发 macOS 内存压力（Free 降至 0.08GB）
+- MPS Unified Memory 内存碎片化，step 时间从 ~10s 劣化至 530s
+- 以当前速度估算，500 步需 70+ 小时，不可接受
+
+**已中止**，保留 step 100 的 checkpoint 作为后续续训起点。
+
+**后续优化方向**：
+1. `--batch-size 1`（降内存压力）
+2. `--save-every 500`（最后只保存一次，避免 2.1GB 文件触发内存问题）
+3. `train.py` epoch 结束后加 `torch.mps.empty_cache()`
+
+---
+
 ## 当前文档状态
 
 | 文档 | 版本 | 路径 |
@@ -535,8 +638,8 @@ poc/sound-repalce-experiments/seed-vc-finetune/
 - [x] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
 - [x] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
 - [ ] **seed-vc Fine-tune 验证**（进行中，见 Fine-tune 计划）
-  - [ ] Phase 1：环境准备（MPS 兼容性 + 数据准备）
-  - [ ] Phase 2：同性别 Fine-tune（exp-07/08）
+  - [x] Phase 1：环境准备（MPS 兼容性 ✅ / 数据准备 ✅ / 监控体系 ✅）
+  - [ ] Phase 2：同性别 Fine-tune（exp-07/08）— 优化配置后重启
   - [ ] Phase 3：跨性别 Fine-tune（exp-09/10）
   - [ ] Phase 4：总结与决策
 - [ ] 跨性别转换优化：`--semi-tone-shift` 降调实验
