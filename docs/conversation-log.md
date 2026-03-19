@@ -707,6 +707,45 @@ else:
 
 ---
 
+---
+
+### 会话四十：ACE-Step 深度技术调研 + PoC-B 验证计划
+
+**背景**：PoC 遗留问题梳理后，将「歌词替换与合成（功能五）」列为最高技术风险项。本次对 ACE-Step 进行深度调研，并制定 PoC-B 验证计划。
+
+**调研结论**：
+
+| 维度 | 结论 |
+|------|------|
+| 核心能力 | Lyric Editing（flow-edit）可直接在原曲 latent 空间替换歌词，保持旋律 |
+| 最新版本 | v1.5（2026-01-28），LM + DiT 混合架构 |
+| 质量水准 | SongEval 自然度 4.59，**超越所有已测商业模型**（Suno v5 为 4.56）|
+| 内存要求 | < 4GB VRAM（M2 Pro 32GB 完全充裕）|
+| macOS 支持 | ✅ 官方支持，需 `--bf16 false` |
+| M2 Pro 预计速度 | RTF ≈ 1.5~2.5×（4 分钟歌曲约 6~10 分钟处理）|
+| 中文支持 | ✅ 中文在 50+ 支持语言中排名靠前 |
+| 对比原方案优势 | 无跨域转换问题；端到端；内置时间对齐 |
+
+**三大关键验证问题（PoC-B 必须验证）**：
+1. **Q1**：对「真实中文录音」（非 AI 生成）的 Lyric Edit 效果
+2. **Q2**：中文字数差异（±0/±3/±6）对音质的影响
+3. **Q3**：全曲逐句编辑拼接后的整体连贯性
+
+**产出文件**：
+- `poc/sound-repalce-experiments/ace-step-research/ace-step-tech-research.md`（技术调研报告）
+- `poc/sound-repalce-experiments/ace-step-research/poc-b-validation-plan.md`（验证计划）
+
+**PoC-B 实验设计（4 个实验，预计 3~4 天）**：
+
+| 实验 | 目标 | 关键验证点 |
+|------|------|----------|
+| exp-11 | 安装冒烟测试 | 环境兼容性、MPS 稳定性 |
+| exp-12 | 单句质量验证（5 组对比）| 旋律保持、字数差异影响 |
+| exp-13 | 全曲逐句替换 | 接缝问题、端到端流程 |
+| exp-14 | 性能 Benchmark | RTF 实测，M2 Pro 真实速度 |
+
+---
+
 ## 当前文档状态
 
 | 文档 | 版本 | 路径 |
@@ -717,6 +756,8 @@ else:
 | PoC-A 验证总结 | — | `poc/sound-repalce-experiments/poc-summary.md` |
 | seed-vc Fine-tune 计划 | — | `poc/sound-repalce-experiments/seed-vc-finetune/plan.md` |
 | RVC Fine-tune 计划 | — | `poc/sound-repalce-experiments/rvc-finetune/plan.md` |
+| **ACE-Step 技术调研报告** | v1.0 | `poc/sound-repalce-experiments/ace-step-research/ace-step-tech-research.md` |
+| **PoC-B 验证计划** | v1.0 | `poc/sound-repalce-experiments/ace-step-research/poc-b-validation-plan.md` |
 
 ---
 
@@ -732,7 +773,13 @@ else:
   - [ ] exp-08：同性别推理对比（vs exp-05 Zero-shot）
   - [ ] exp-09：痛仰跨性别 Fine-tune 训练
   - [ ] exp-10：跨性别推理对比（vs exp-06 Zero-shot）
-- [ ] PoC-B：歌词替换与合成验证（功能五，技术风险最高）
+- [ ] **PoC-B：歌词替换与合成验证**（方案已定，待 RVC 实验完成后启动）
+  - [x] ACE-Step 技术调研
+  - [x] PoC-B 验证计划（exp-11~14）
+  - [ ] exp-11：ACE-Step 安装冒烟测试
+  - [ ] exp-12：Lyric Editing 单句质量验证
+  - [ ] exp-13：全曲逐句替换流程验证
+  - [ ] exp-14：M2 Pro 性能 Benchmark
 
 ---
 
