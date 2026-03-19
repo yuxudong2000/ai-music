@@ -621,6 +621,92 @@ epoch 0, step 0, loss: 0.5765, step_time: 8.3s
 
 ---
 
+## 2026-03-19
+
+### 会话三十七：切换 RVC Fine-tune 方案 + 深度调研
+
+**背景**：seed-vc Fine-tune 因 2.1GB checkpoint 触发 macOS 内存压力（530s/step），彻底中止。切换到 RVC（Retrieval-based Voice Conversion）方案。
+
+**调研结论**：
+
+| 维度 | seed-vc Fine-tune | RVC Fine-tune |
+|------|-------------------|---------------|
+| 模型大小 | ~2.1GB/checkpoint | ~60-80MB |
+| macOS 兼容性 | ⚠️ MPS 内存压力严重 | ✅ CPU/MPS 均可 |
+| 预估训练时间 | 70+ 小时 | ~30-60 分钟 |
+| 社区成熟度 | 较新 | ⭐⭐⭐⭐⭐ |
+
+**工具选型**：Applio（IAHispano/Applio），官方支持 macOS，提供 `run-install.sh` 脚本。
+
+**产出文件**：
+- `poc/sound-repalce-experiments/rvc-finetune/plan.md`（完整方案，11 个章节）
+- `rvc-finetune/exp-07~10/` 目录结构
+- `run_train.sh`、`monitor_rvc_train.sh` 监控脚本
+
+---
+
+### 会话三十八：Applio 安装与环境配置
+
+**操作**：
+1. 新建 `rvc` conda 环境（Python 3.12，Applio 官方要求）
+2. Clone Applio 到 `/Users/yuxudong/Documents/applio/`
+3. 手动 `pip install -r requirements.txt` 安装依赖
+
+**关键依赖安装结果**：
+
+| 包 | 版本 | 状态 |
+|----|------|------|
+| torch | 2.7.1 + MPS | ✅ |
+| faiss-cpu | 1.13.2 | ✅ |
+| numpy | 2.3.5 | ✅ |
+| numba | 0.63.1 | ✅ |
+| praat-parselmouth | 0.4.7 | ✅ |
+| pyworld | 0.3.5 | ✅（需设置 SDKROOT + conda install libcxx）|
+| librosa / soundfile | 0.11.0 / 0.12.1 | ✅ |
+| transformers | 4.44.2 | ✅ |
+
+**遇到问题**：
+- `pyworld` 编译失败：`fatal error: 'algorithm' file not found`
+  - 根因：macOS C++ 头文件路径问题，conda 环境的 include 路径覆盖系统路径
+  - 修复：`conda install -n rvc -c conda-forge libcxx` 后正常编译
+
+---
+
+### 会话三十九：exp-07 训练脚本调试与 Bug 修复
+
+**目标**：用邓丽君 5 首歌净化人声（共 ~22 分钟）训练 RVC v2 模型。
+
+**连环 Bug 排查过程**：
+
+| # | Bug | 现象 | 根因 | 修复 |
+|---|-----|------|------|------|
+| 1 | `gpu=0` → `cuda:0` | 特征提取 `0it`，0 个特征文件 | `extract.py` 硬编码只支持 cuda/cpu，无 MPS 路径 | patch `extract.py` 加 MPS 自动检测分支 |
+| 2 | `cut_preprocess="True"` | 预处理报 5/5 完成，但 `sliced_audios/` 为空 | preprocess.py 只匹配 `"Skip"/"Simple"/"Automatic"`，`"True"` 不匹配任何分支 | 改为 `"Automatic"` |
+| 3 | 多进程异常静默吞掉 | 进度条显示 5/5 成功，实际 0 个文件 | `try/except` 捕获了错误但继续执行 | 以上两个修复后不再触发 |
+
+**Applio 源码修改**（`/Users/yuxudong/Documents/applio/rvc/train/extract/extract.py` L215）：
+```python
+# 原始（只支持 cuda/cpu）
+devices = ["cpu"] if gpus == "-" else [f"cuda:{idx}" for idx in gpus.split("-")]
+
+# 修复后（自动检测 MPS）
+if gpus == "-":
+    devices = ["cpu"]
+elif gpus == "mps" or (gpus != "-" and not torch.cuda.is_available() and torch.backends.mps.is_available()):
+    devices = ["mps"]
+else:
+    devices = [f"cuda:{idx}" for idx in gpus.split("-")]
+```
+
+**当前状态**：exp-07 训练正在运行中 🚀
+- 预处理：✅ `Automatic` 切分，生成切片文件
+- 特征提取：✅ 走 MPS 路径
+- 训练：✅ 进行中，`smoothed_loss_gen=29.412`，正在保存 checkpoint
+
+**exp-08/09/10 推理脚本**已预先创建，exp-07 完成后可直接使用。
+
+---
+
 ## 当前文档状态
 
 | 文档 | 版本 | 路径 |
@@ -629,22 +715,24 @@ epoch 0, step 0, loss: 0.5765, step_time: 8.3s
 | 技术预研选型文档 | v0.3 | `docs/tech-research.md` |
 | 对话记录 | — | `docs/conversation-log.md` |
 | PoC-A 验证总结 | — | `poc/sound-repalce-experiments/poc-summary.md` |
-| Fine-tune 验证计划 | — | `poc/sound-repalce-experiments/seed-vc-finetune/plan.md` |
+| seed-vc Fine-tune 计划 | — | `poc/sound-repalce-experiments/seed-vc-finetune/plan.md` |
+| RVC Fine-tune 计划 | — | `poc/sound-repalce-experiments/rvc-finetune/plan.md` |
 
 ---
 
 ## 待办事项
 
-- [x] seed-vc 安装：`git clone` + Apple Silicon 专用依赖
-- [x] PoC-A：Demucs + seed-vc 跑通声音替换（功能三）
-- [ ] **seed-vc Fine-tune 验证**（进行中，见 Fine-tune 计划）
-  - [x] Phase 1：环境准备（MPS 兼容性 ✅ / 数据准备 ✅ / 监控体系 ✅）
-  - [ ] Phase 2：同性别 Fine-tune（exp-07/08）— 优化配置后重启
-  - [ ] Phase 3：跨性别 Fine-tune（exp-09/10）
-  - [ ] Phase 4：总结与决策
-- [ ] 跨性别转换优化：`--semi-tone-shift` 降调实验
+- [x] seed-vc 安装与 PoC-A 验证
+- [x] seed-vc Fine-tune 尝试（因内存问题中止，切换方案）
+- [x] RVC Fine-tune 方案调研与计划制定
+- [x] Applio 安装与环境配置（rvc conda 环境，Python 3.12）
+- [ ] **RVC Fine-tune 验证**（进行中）
+  - [x] Applio 安装 + Bug 修复（extract.py MPS patch + cut_preprocess 修复）
+  - [ ] exp-07：邓丽君同性别 Fine-tune 训练（**进行中** 🚀）
+  - [ ] exp-08：同性别推理对比（vs exp-05 Zero-shot）
+  - [ ] exp-09：痛仰跨性别 Fine-tune 训练
+  - [ ] exp-10：跨性别推理对比（vs exp-06 Zero-shot）
 - [ ] PoC-B：歌词替换与合成验证（功能五，技术风险最高）
-- [ ] 各功能模块的具体实现
 
 ---
 
