@@ -46,6 +46,34 @@ def lrc_preview(
 
 
 # --- Voice 命令 ---
+@voice_app.command("preprocess")
+def voice_preprocess(
+    input: str = typer.Option(..., "--input", help="输入音频（mp3/wav）"),
+    out_dir: str = typer.Option("poc/audio/processed", "--out-dir", help="输出目录根路径"),
+    dereverb_model: str = typer.Option(
+        "dereverb_mel_band_roformer",
+        "--dereverb-model",
+        help="去混响模型名（audio-separator）",
+    ),
+):
+    """人声预处理：Demucs 分离 + 去混响（保留中间产物）"""
+    import subprocess
+    import sys
+
+    cmd = [
+        sys.executable,
+        "poc/audio/process_vocals.py",
+        "--input",
+        input,
+        "--out-dir",
+        out_dir,
+        "--dereverb-model",
+        dereverb_model,
+    ]
+    typer.echo(f"🎛️  运行：{' '.join(cmd)}")
+    subprocess.check_call(cmd)
+
+
 @voice_app.command("learn")
 def voice_learn(
     name: str = typer.Option(..., "--name", help="声音模型名称"),

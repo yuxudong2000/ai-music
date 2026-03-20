@@ -780,6 +780,9 @@ else:
     - 修正：v1.5 要求 Python >=3.11（非 3.10）
     - 修正：v1.5 启动参数变更（去掉 --bf16/--cpu_offload/--overlapped_decode，改用 --device mps --backend mlx）
     - v1.5 自动识别 M2 Pro 25GB 统一内存，tier=unlimited，mlx 后端
+  - [x] 新增人声预处理脚本：Demucs 分离 + 去混响（保留中间产物）
+    - 脚本：`poc/audio/process_vocals.py`
+    - CLI：`ai-music voice preprocess --input <mp3/wav>`
   - [ ] exp-11：ACE-Step 冒烟测试（模型下载中，`acestep-v15-turbo` 4.79GB + `Qwen3-Embedding` 1.19GB）
   - [ ] exp-12：Lyric Editing 单句质量验证
   - [ ] exp-13：全曲逐句替换流程验证
