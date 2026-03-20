@@ -51,9 +51,12 @@ def voice_preprocess(
     input: str = typer.Option(..., "--input", help="输入音频（mp3/wav）"),
     out_dir: str = typer.Option("poc/audio/processed", "--out-dir", help="输出目录根路径"),
     dereverb_model: str = typer.Option(
-        "dereverb_mel_band_roformer",
+        "dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
         "--dereverb-model",
-        help="去混响模型名（audio-separator）",
+        help=(
+            "audio-separator 的 model_filename（默认：dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt，用于去混响/去回声；"
+            "可用 audio-separator -l --list_filter dereverb 查看更多模型）"
+        ),
     ),
 ):
     """人声预处理：Demucs 分离 + 去混响（保留中间产物）"""

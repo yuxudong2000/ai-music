@@ -112,17 +112,24 @@ def dereverb_vocals(vocals_wav: Path, out_dir: Path, model: str) -> Path:
     dereverb_out.mkdir(parents=True, exist_ok=True)
 
     # audio-separator CLI
-    # 说明：不同版本参数略有差异，仓库当前已固定到 0.42.1
-    # 常用：audio-separator -m <model> -i <input> -o <outdir>
+    # 说明：当前环境中 audio-separator 的参数为：
+    #   audio-separator --model_filename <model> --output_dir <dir> <audio_file>
+    # （input 音频是 positional 参数，不支持 -i/-o）
     cmd = [
         "audio-separator",
-        "-m",
+        "--model_filename",
         model,
-        "-i",
-        str(vocals_wav),
-        "-o",
+        "--output_dir",
         str(dereverb_out),
+        str(vocals_wav),
     ]
+
+    print(
+        "ℹ️  若提示模型不存在，可先列出可用的 dereverb 模型：\n"
+        "   audio-separator -l --list_filter dereverb\n"
+        f"   （当前传入：{model}）"
+    )
+
     run(cmd)
 
     # 寻找最新输出 wav
@@ -154,8 +161,11 @@ def main() -> None:
     )
     parser.add_argument(
         "--dereverb-model",
-        default="dereverb_mel_band_roformer",
-        help="audio-separator 去混响模型名（默认：dereverb_mel_band_roformer）",
+        default="dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt",
+        help=(
+            "audio-separator 的 model_filename（默认：dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt，用于去混响/去回声；"
+            "可运行 audio-separator -l --list_filter dereverb 查看支持列表并切换）"
+        ),
     )
 
     args = parser.parse_args()
