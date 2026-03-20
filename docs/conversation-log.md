@@ -769,14 +769,18 @@ else:
 - [x] Applio 安装与环境配置（rvc conda 环境，Python 3.12）
 - [ ] **RVC Fine-tune 验证**（进行中）
   - [x] Applio 安装 + Bug 修复（extract.py MPS patch + cut_preprocess 修复）
-  - [ ] exp-07：邓丽君同性别 Fine-tune 训练（**进行中** 🚀）
-  - [ ] exp-08：同性别推理对比（vs exp-05 Zero-shot）
-  - [ ] exp-09：痛仰跨性别 Fine-tune 训练
-  - [ ] exp-10：跨性别推理对比（vs exp-06 Zero-shot）
-- [ ] **PoC-B：歌词替换与合成验证**（方案已定，待 RVC 实验完成后启动）
+  - [x] exp-07：邓丽君同性别 Fine-tune 训练 ✅（最佳模型 `denglijun_rvc_200e_8400s_best_epoch.pth`）
+  - [x] exp-08：同性别推理对比（run_infer_script 参数修复；输出 rvc_idx050/075 + 混音）
+  - [ ] exp-09：痛仰跨性别 Fine-tune 训练（**进行中** 🚀 `douwei_rvc`，epoch 2/200）
+  - [ ] exp-10：跨性别推理对比（脚本已预先修复，等 exp-09 完成后运行）
+- [ ] **PoC-B：歌词替换与合成验证**（进行中）
   - [x] ACE-Step 技术调研
   - [x] PoC-B 验证计划（exp-11~14）
-  - [ ] exp-11：ACE-Step 安装冒烟测试
+  - [x] ACE-Step v1.5 安装（Python 3.11，conda ace_step 环境）
+    - 修正：v1.5 要求 Python >=3.11（非 3.10）
+    - 修正：v1.5 启动参数变更（去掉 --bf16/--cpu_offload/--overlapped_decode，改用 --device mps --backend mlx）
+    - v1.5 自动识别 M2 Pro 25GB 统一内存，tier=unlimited，mlx 后端
+  - [ ] exp-11：ACE-Step 冒烟测试（模型下载中，`acestep-v15-turbo` 4.79GB + `Qwen3-Embedding` 1.19GB）
   - [ ] exp-12：Lyric Editing 单句质量验证
   - [ ] exp-13：全曲逐句替换流程验证
   - [ ] exp-14：M2 Pro 性能 Benchmark

@@ -39,16 +39,28 @@ OUTPUT_DIR = f"{EXP_BASE}/rvc-finetune/exp-08-ft-same-gender-infer/output"
 Path(OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────────────────────
-# 找最新 checkpoint 和 index
+# 找推理模型文件（导出格式，包含 config 字段）
+# 注意：G_*.pth 是训练原始 checkpoint，不能直接用于推理
+#       推理需要 Applio 导出的 {model_name}_*e_*s*.pth 文件
 # ─────────────────────────────────────────────────────────────
-pth_files = sorted(glob.glob(f"{MODEL_DIR}/G_*.pth"))
+MODEL_NAME = "denglijun_rvc"
+
+# 优先找 best_epoch 版本
+best_files = sorted(glob.glob(f"{MODEL_DIR}/{MODEL_NAME}_*best_epoch.pth"))
+all_export = sorted(glob.glob(f"{MODEL_DIR}/{MODEL_NAME}_*.pth"))
 index_files = sorted(glob.glob(f"{MODEL_DIR}/added_*.index"))
 
-if not pth_files:
-    raise FileNotFoundError(f"找不到 G_*.pth，请先完成 exp-07 训练。路径: {MODEL_DIR}")
+if best_files:
+    PTH_PATH = best_files[-1]   # best epoch 优先
+elif all_export:
+    PTH_PATH = all_export[-1]   # 取最新导出
+else:
+    raise FileNotFoundError(
+        f"找不到推理模型文件（{MODEL_NAME}_*.pth），请先完成 exp-07 训练。\n"
+        f"路径: {MODEL_DIR}\n"
+        f"提示：G_*.pth 是训练 checkpoint，不能直接用于推理。"
+    )
 
-# 优先选最新的（epoch 最大）
-PTH_PATH   = pth_files[-1]
 INDEX_PATH = index_files[-1] if index_files else ""
 
 log(f"使用模型: {PTH_PATH}")
@@ -68,41 +80,38 @@ for cfg in CONFIGS:
     log(f"推理中: {cfg['tag']} (index_rate={cfg['index_rate']}, pitch={cfg['pitch']})...")
     t0 = time.time()
     run_infer_script(
-        pitch          = cfg["pitch"],
-        filter_radius  = 3,
-        index_rate     = cfg["index_rate"],
-        volume_envelope= 0.25,
-        protect        = 0.33,
-        hop_length     = 128,
-        f0_method      = "rmvpe",
-        input_path     = SOURCE_WAV,
-        output_path    = out_wav,
-        pth_path       = PTH_PATH,
-        index_path     = INDEX_PATH,
-        split_audio    = False,
-        f0_autotune    = False,
-        f0_autotune_strength = 1.0,
-        clean_audio    = True,
-        clean_strength = 0.5,
-        export_format  = "WAV",
-        embedder_model = "contentvec",
-        upscale_audio  = False,
-        formant_shifting = False,
-        formant_qfrency = 1.0,
-        formant_timbre  = 1.0,
-        post_process   = False,
-        reverb         = False,
-        pitch_shift    = False,
-        limiter        = False,
-        gain           = False,
-        distortion     = False,
-        chorus         = False,
-        bitcrush       = False,
-        clipping       = False,
-        compressor     = False,
-        delay          = False,
-        sliders        = None,
-        sample_rate    = 44100,
+        pitch                    = cfg["pitch"],
+        index_rate               = cfg["index_rate"],
+        volume_envelope          = 0.25,
+        protect                  = 0.33,
+        f0_method                = "rmvpe",
+        input_path               = SOURCE_WAV,
+        output_path              = out_wav,
+        pth_path                 = PTH_PATH,
+        index_path               = INDEX_PATH,
+        split_audio              = False,
+        f0_autotune              = False,
+        f0_autotune_strength     = 1.0,
+        proposed_pitch           = False,
+        proposed_pitch_threshold = 155.0,
+        clean_audio              = True,
+        clean_strength           = 0.5,
+        export_format            = "WAV",
+        embedder_model           = "contentvec",
+        formant_shifting         = False,
+        formant_qfrency          = 1.0,
+        formant_timbre           = 1.0,
+        post_process             = False,
+        reverb                   = False,
+        pitch_shift              = False,
+        limiter                  = False,
+        gain                     = False,
+        distortion               = False,
+        chorus                   = False,
+        bitcrush                 = False,
+        clipping                 = False,
+        compressor               = False,
+        delay                    = False,
     )
     dt = time.time() - t0
     log(f"完成 {cfg['tag']} → {out_wav}  ({dt:.1f}s)")
