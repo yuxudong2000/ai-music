@@ -790,4 +790,56 @@ else:
 
 ---
 
+### 会话四十一：RVC 训练推进、人声预处理排查与阶段总结归档
+
+**背景**：在 RVC Fine-tune 方案下继续推进同性别/跨性别实验，同时开始进入歌词替换 PoC-B 的环境验证阶段。
+
+**本轮主要进展**：
+
+1. **RVC 训练与推理**
+   - exp-07（邓丽君同性别）训练完成，产出最佳模型：`denglijun_rvc_200e_8400s_best_epoch.pth`
+   - exp-08 推理脚本完成适配，修复 `run_infer_script` 新版参数签名问题
+   - exp-09（窦唯/痛仰跨性别）训练完成，产出最佳模型：`douwei_rvc_200e_16000s_best_epoch.pth`
+   - exp-10 推理脚本发现 `.index` 匹配问题：目录中实际存在 `douwei_rvc.index`，但脚本只匹配 `added_*.index`，导致日志长期显示 `使用索引: (无 index)`
+
+2. **RVC 当前关键问题定位**
+   - 在“无 index”情况下，RVC 推理可以稳定跑通，但输出人声仍明显保留原唱风格，目标音色强化有限
+   - 在修正脚本并真正启用 `douwei_rvc.index` 后，推理开始阶段触发 `segmentation fault`
+   - 初步判断：问题不再是脚本参数，而是 **FAISS / index 检索链路在 Apple Silicon 环境下的原生崩溃风险**
+
+3. **人声预处理链路排查**
+   - Demucs 人声分离已稳定跑通，可输出 `vocals.wav / no_vocals.wav`
+   - 使用 `audio-separator` 做去回声/去混响时，确认当前版本要求传递真实的 `model_filename`
+   - 通过 `audio-separator -l --list_filter dereverb --list_format json` 找到多个可用 dereverb 模型：
+     - `dereverb_mel_band_roformer_anvuew_sdr_19.1729.ckpt`
+     - `dereverb_mel_band_roformer_less_aggressive_anvuew_sdr_18.8050.ckpt`
+     - `dereverb-echo_mel_band_roformer_sdr_13.4843_v2.ckpt`
+   - 结论：dereverb 模型本身可用，但调用链路与默认模型名仍需工程化收口
+
+4. **ACE-Step / PoC-B 进展**
+   - ACE-Step v1.5 环境已装起，确认 Python 版本要求为 `>=3.11,<3.13`
+   - 旧版启动参数 `--bf16 / --cpu_offload / --overlapped_decode` 已失效，v1.5 会自动选择 MPS / mlx 路径
+   - PoC-B 目前已完成调研与验证计划，正式效果实验（exp-11~14）尚未完成
+
+5. **阶段总结沉淀**
+   - 新增阶段总结文档：`poc/current-progress-summary.md`
+   - 汇总当前 POC 进展、已完成事项、核心阻塞问题与下一步优先级
+
+**当前阶段结论**：
+
+- ✅ PoC-A 基础声音替换链路已验证可行
+- ✅ RVC Fine-tune 在 Apple Silicon 上可完成训练
+- ⚠️ RVC 在不启用 index 时音色强化不足
+- ❌ RVC 在启用 index 后出现 `segmentation fault`，成为当前最大阻塞点
+- ⚠️ ACE-Step / SoulX-Singer 仍需进入正式对比实验，功能五尚不能收敛最终方案
+
+**下一步优先级**：
+
+1. P0：排查 RVC + FAISS index 崩溃问题
+2. P1：推进 ACE-Step 冒烟与单句验证（exp-11 / exp-12）
+3. P2：固化人声预处理脚本（分离 → dereverb）
+4. P3：推进 SoulX-Singer 同素材对比实验
+
+---
+
 *记录持续更新中*
